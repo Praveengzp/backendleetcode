@@ -28,22 +28,27 @@ app.use('/ai',aiRouter);
 app.use("/video",videoRouter);
 
 
-const InitalizeConnection = async ()=>{
-    try{
+const PORT = process.env.PORT || 10000;
+const HOST = "0.0.0.0";
 
-        await Promise.all([main(),redisClient.connect()]);
-        console.log("DB Connected");
-        
-        app.listen(process.env.PORT, ()=>{
-            console.log("Server listening at port number: "+ process.env.PORT);
-        })
+app.listen(PORT, HOST, () => {
+    console.log("Server listening at port number: " + PORT);
+});
 
+const initializeConnections = async () => {
+    const results = await Promise.allSettled([main(), redisClient.connect()]);
+
+    if (results[0].status === "fulfilled") {
+        console.log("MongoDB connected");
+    } else {
+        console.error("MongoDB connection failed:", results[0].reason);
     }
-    catch(err){
-        console.log("Error: "+err);
+
+    if (results[1].status === "fulfilled") {
+        console.log("Redis connected");
+    } else {
+        console.error("Redis connection failed:", results[1].reason);
     }
-}
+};
 
-
-InitalizeConnection();
-
+initializeConnections();
