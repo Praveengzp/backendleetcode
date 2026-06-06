@@ -28,13 +28,6 @@ app.use('/ai',aiRouter);
 app.use("/video",videoRouter);
 
 
-const PORT = process.env.PORT || 10000;
-const HOST = "0.0.0.0";
-
-app.listen(PORT, HOST, () => {
-    console.log("Server listening at port number: " + PORT);
-});
-
 const initializeConnections = async () => {
     const results = await Promise.allSettled([main(), redisClient.connect()]);
 
@@ -51,4 +44,11 @@ const initializeConnections = async () => {
     }
 };
 
-initializeConnections();
+const PORT = process.env.PORT || 10000;
+const HOST = "0.0.0.0";
+
+initializeConnections().finally(() => {
+    app.listen(PORT, HOST, () => {
+        console.log("Server listening at port number: " + PORT);
+    });
+});
