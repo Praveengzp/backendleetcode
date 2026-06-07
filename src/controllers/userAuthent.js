@@ -5,6 +5,42 @@ const bcrypt = require("bcryptjs");
 const jwt = require('jsonwebtoken');
 const Submission = require("../models/submission")
 
+const isProduction = process.env.NODE_ENV === 'production' || process.env.RENDER;
+const authCookieOptions = {
+    httpOnly: true,
+    sameSite: isProduction ? 'none' : 'lax',
+    secure: isProduction,
+    maxAge: 60 * 60 * 1000
+};
+
+const clearAuthCookieOptions = {
+    httpOnly: true,
+    sameSite: isProduction ? 'none' : 'lax',
+    secure: isProduction,
+    expires: new Date(0)
+};
+
+const createAuthResponse = (user, token) => ({
+    user: {
+        firstName: user.firstName,
+        emailId: user.emailId,
+        _id: user._id,
+        role: user.role,
+    },
+    token
+});
+
+const getTokenFromRequest = (req) => {
+    const cookieToken = req.cookies?.token;
+    const authHeader = req.headers.authorization;
+
+    if (authHeader?.startsWith("Bearer ")) {
+        return authHeader.split(" ")[1];
+    }
+
+    return cookieToken;
+};
+
 
 const register = async (req,res)=>{
     
@@ -20,17 +56,10 @@ const register = async (req,res)=>{
     
      const user =  await User.create(req.body);
      const token =  jwt.sign({_id:user._id , emailId:emailId, role:'user'},process.env.JWT_KEY,{expiresIn: 60*60});
-     const reply = {
-        firstName: user.firstName,
-        emailId: user.emailId,
-        _id: user._id,
-        role:user.role,
-    }
-    
-     res.cookie('token',token,{maxAge: 60*60*1000});
+     res.cookie('token',token,authCookieOptions);
      res.status(201).json({
-        user:reply,
-        message:"Loggin Successfully"
+        ...createAuthResponse(user, token),
+        message:"Registered Successfully"
     })
     }
     catch(err){
@@ -51,22 +80,18 @@ const login = async (req,res)=>{
 
         const user = await User.findOne({emailId});
 
+        if(!user)
+            throw new Error("Invalid Credentials");
+
         const match = await bcrypt.compare(password,user.password);
 
         if(!match)
             throw new Error("Invalid Credentials");
 
-        const reply = {
-            firstName: user.firstName,
-            emailId: user.emailId,
-            _id: user._id,
-            role:user.role,
-        }
-
         const token =  jwt.sign({_id:user._id , emailId:emailId, role:user.role},process.env.JWT_KEY,{expiresIn: 60*60});
-        res.cookie('token',token,{maxAge: 60*60*1000});
+        res.cookie('token',token,authCookieOptions);
         res.status(201).json({
-            user:reply,
+            ...createAuthResponse(user, token),
             message:"Loggin Successfully"
         })
     }
@@ -81,7 +106,10 @@ const login = async (req,res)=>{
 const logout = async(req,res)=>{
 
     try{
-        const {token} = req.cookies;
+        const token = getTokenFromRequest(req);
+        if(!token)
+            throw new Error("Token is not persent");
+
         const payload = jwt.decode(token);
 
 
@@ -90,7 +118,7 @@ const logout = async(req,res)=>{
     //    Token add kar dung Redis ke blockList
     //    Cookies ko clear kar dena.....
 
-    res.cookie("token",null,{expires: new Date(Date.now())});
+    res.clearCookie("token",clearAuthCookieOptions);
     res.send("Logged Out Succesfully");
 
     }
@@ -113,8 +141,11 @@ const adminRegister = async(req,res)=>{
     
      const user =  await User.create(req.body);
      const token =  jwt.sign({_id:user._id , emailId:emailId, role:user.role},process.env.JWT_KEY,{expiresIn: 60*60});
-     res.cookie('token',token,{maxAge: 60*60*1000});
-     res.status(201).send("User Registered Successfully");
+     res.cookie('token',token,authCookieOptions);
+     res.status(201).json({
+        ...createAuthResponse(user, token),
+        message:"User Registered Successfully"
+    });
     }
     catch(err){
         res.status(400).send("Error: "+err);
