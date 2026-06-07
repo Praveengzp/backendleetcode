@@ -203,10 +203,6 @@ const getAllProblem = async(req,res)=>{
      
     const getProblem = await Problem.find({}).select('_id title difficulty tags');
 
-   if(getProblem.length==0)
-    return res.status(404).send("Problem is Missing");
-
-
    res.status(200).send(getProblem);
   }
   catch(err){
@@ -257,5 +253,4 @@ const submittedProblem = async(req,res)=>{
 
 
 module.exports = {createProblem,updateProblem,deleteProblem,getProblemById,getAllProblem,solvedAllProblembyUser,submittedProblem};
-
 
